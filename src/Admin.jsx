@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { categories } from "./data";
-import { formatPrice } from "./utils";
-import { supabase } from "./utils/supabase";
+import { formatPrice, supabase } from "./utils/supabase";
 
 export function AdminPanel({ items, setItems, contacts, setContacts }) {
   const [password, setPassword] = useState("");

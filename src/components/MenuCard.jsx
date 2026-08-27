@@ -1,5 +1,14 @@
-import { formatPrice, getMenuImage } from "../utils/supabase";
 import { Quantity } from "./Quantity";
+
+const formatPrice = (price) => {
+  if (!price && price !== 0) return "";
+  return `${price} ₽`;
+};
+
+const getMenuImage = (item) => {
+  if (item?.image) return item.image;
+  return "/images/menu-hot.jpg";
+};
 
 export function MenuCard({ item, count, onChange }) {
   return (
