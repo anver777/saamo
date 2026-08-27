@@ -5,6 +5,7 @@ import { formatPrice } from "./utils";
 import { MenuCard } from "./components/MenuCard";
 import { Quantity } from "./components/Quantity";
 import { AdminPanel } from "./Admin";
+import { supabase } from './utils/supabase';
 
 function App() {
   const [storedItems, setStoredItems] = useState(() => {
@@ -16,6 +17,30 @@ function App() {
     const saved = localStorage.getItem("saamo_contacts");
     return saved ? JSON.parse(saved) : { phone, whatsapp, address, mapUrl, heroImage: "/images/saamo-hero.jpg", adminPassword };
   });
+
+  // Загрузка данных из Supabase при старте
+  useEffect(() => {
+    async function fetchItemsFromSupabase() {
+      try {
+        const { data, error } = await supabase
+          .from('items')
+          .select('*');
+
+        if (!error && data && data.length > 0) {
+          // Приводим названия полей Supabase к формату приложения (title -> name)
+          const formattedItems = data.map(item => ({
+            ...item,
+            name: item.title || item.name
+          }));
+          setStoredItems(formattedItems);
+        }
+      } catch (err) {
+        console.error("Ошибка при получении данных из Supabase:", err);
+      }
+    }
+
+    fetchItemsFromSupabase();
+  }, []);
 
   const dynamicCategories = useMemo(() => {
     const existing = new Set(storedItems.map((item) => item.category));
@@ -56,7 +81,8 @@ function App() {
   const visibleItems = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     return storedItems.filter((item) => {
-      const inSearch = !normalized || `${item.name} ${item.description ?? ""} ${item.category}`.toLowerCase().includes(normalized);
+      const name = item.name || item.title || "";
+      const inSearch = !normalized || `${name} ${item.description ?? ""} ${item.category}`.toLowerCase().includes(normalized);
       if (normalized) return inSearch;
       return activeCategory === "Популярное" ? popularIds.has(item.id) : item.category === activeCategory;
     });
@@ -64,14 +90,14 @@ function App() {
 
   const orderItems = useMemo(() => {
     return Object.entries(order)
-      .map(([id, count]) => ({ item: storedItems.find((menuItem) => menuItem.id === id), count }))
+      .map(([id, count]) => ({ item: storedItems.find((menuItem) => menuItem.id === id || menuItem.id === Number(id)), count }))
       .filter((entry) => Boolean(entry.item) && entry.count > 0);
   }, [order, storedItems]);
 
-  const total = orderItems.reduce((sum, entry) => sum + entry.item.price * entry.count, 0);
+  const total = orderItems.reduce((sum, entry) => sum + (Number(entry.item.price) || 0) * entry.count, 0);
   const orderCount = orderItems.reduce((sum, entry) => sum + entry.count, 0);
   const whatsappText = encodeURIComponent(
-    `Здравствуйте! Хочу уточнить заказ в Саамо:\n${orderItems.map(({ item, count }) => `${count} x ${item.name} - ${formatPrice(item.price * count)}`).join("\n")}\nИтого: ${formatPrice(total)}`,
+    `Здравствуйте! Хочу уточнить заказ в Саамо:\n${orderItems.map(({ item, count }) => `${count} x ${item.name || item.title} - ${formatPrice((item.price || 0) * count)}`).join("\n")}\nИтого: ${formatPrice(total)}`,
   );
 
   function changeCount(id, delta) {
@@ -92,14 +118,14 @@ function App() {
     <main className="min-h-screen bg-[#f8f1e7] text-[#261711]">
       <section className="relative min-h-[92vh] overflow-hidden bg-[#1c120d] text-white">
         <motion.img
-            key={contacts.heroImage || "/images/saamo-hero.jpg"}
-            initial={{ scale: 1.08, opacity: 0.45 }}
-            animate={{ scale: 1, opacity: 0.72 }}
-            transition={{ duration: 1.4, ease: "easeOut" }}
-            src={contacts.heroImage || "/images/saamo-hero.jpg"}
-            alt="Ресторан грузинской кухни Саамо в Москве, хинкальная на Первомайской"
-            className="absolute inset-0 h-full w-full object-cover"
-          />
+          key={contacts.heroImage || "/images/saamo-hero.jpg"}
+          initial={{ scale: 1.08, opacity: 0.45 }}
+          animate={{ scale: 1, opacity: 0.72 }}
+          transition={{ duration: 1.4, ease: "easeOut" }}
+          src={contacts.heroImage || "/images/saamo-hero.jpg"}
+          alt="Ресторан грузинской кухни Саамо в Москве, хинкальная на Первомайской"
+          className="absolute inset-0 h-full w-full object-cover"
+        />
         <div className="absolute inset-0 bg-gradient-to-b from-black/45 via-black/25 to-[#1c120d]" />
         <div className="relative z-10 flex min-h-[92vh] flex-col justify-between px-5 py-6">
           <motion.div initial={{ y: -16, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.15 }} className="flex items-center justify-between text-sm">
@@ -248,7 +274,7 @@ function App() {
                   {orderItems.map(({ item, count }) => (
                     <div key={item.id} className="flex items-center justify-between gap-3 border-b border-[#e2d3bf] pb-3">
                       <div>
-                        <p className="font-semibold">{item.name}</p>
+                        <p className="font-semibold">{item.name || item.title}</p>
                         <p className="text-sm text-[#7b6657]">{count} x {formatPrice(item.price)}</p>
                       </div>
                       <Quantity count={count} onMinus={() => changeCount(item.id, -1)} onPlus={() => changeCount(item.id, 1)} />

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { categories } from "./data";
 import { formatPrice } from "./utils";
+import { supabase } from "./utils/supabase";
 
 export function AdminPanel({ items, setItems, contacts, setContacts }) {
   const [password, setPassword] = useState("");
@@ -59,22 +60,66 @@ export function AdminPanel({ items, setItems, contacts, setContacts }) {
     alert("✅ Пароль успешно изменен!");
   }
 
-  function handleSave(item) {
+  async function handleSave(item) {
     if (!item.name || !item.price || !item.category) {
       return alert("Заполните название, цену и категорию");
     }
 
+    // Подготовка объекта данных под структуру таблицы Supabase
+    const payload = {
+      title: item.name,
+      price: String(item.price),
+      category: item.category,
+      weight: item.weight || "",
+      image: item.image || ""
+    };
+
     if (item.id) {
-      setItems(items.map((i) => (i.id === item.id ? item : i)));
+      // Редактирование существующей записи
+      const { error } = await supabase
+        .from('items')
+        .update(payload)
+        .eq('id', item.id);
+
+      if (error) {
+        console.error("Ошибка при обновлении в Supabase:", error);
+        return alert("Не удалось сохранить изменения в базе данных.");
+      }
+
+      setItems(items.map((i) => (i.id === item.id ? { ...item, ...payload } : i)));
     } else {
-      const newItem = { ...item, id: Date.now().toString() };
-      setItems([newItem, ...items]);
+      // Добавление новой записи
+      const { data, error } = await supabase
+        .from('items')
+        .insert([payload])
+        .select();
+
+      if (error) {
+        console.error("Ошибка при добавлении в Supabase:", error);
+        return alert("Не удалось добавить блюдо в базу данных.");
+      }
+
+      if (data && data.length > 0) {
+        const newItem = { ...data[0], name: data[0].title };
+        setItems([newItem, ...items]);
+      }
     }
+
     setEditing(null);
   }
 
-  function handleDelete(id) {
+  async function handleDelete(id) {
     if (window.confirm("Точно удалить это блюдо?")) {
+      const { error } = await supabase
+        .from('items')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        console.error("Ошибка при удалении из Supabase:", error);
+        return alert("Не удалось удалить блюдо из базы данных.");
+      }
+
       setItems(items.filter((i) => i.id !== id));
     }
   }
@@ -86,7 +131,7 @@ export function AdminPanel({ items, setItems, contacts, setContacts }) {
       img.onload = () => {
         const canvas = document.createElement("canvas");
         let { width, height } = img;
-        const max = 800; // Ограничиваем размер до 800px для экономии памяти
+        const max = 800;
         if (width > max || height > max) {
           if (width > height) { height = Math.round(height * max / width); width = max; }
           else { width = Math.round(width * max / height); height = max; }
@@ -95,7 +140,6 @@ export function AdminPanel({ items, setItems, contacts, setContacts }) {
         canvas.height = height;
         const ctx = canvas.getContext("2d");
         ctx?.drawImage(img, 0, 0, width, height);
-        // Сжимаем до 60% качества (JPEG) — картинка будет весить ~50-80 КБ
         callback(canvas.toDataURL("image/jpeg", 0.6));
       };
       img.src = e.target.result;
@@ -111,7 +155,6 @@ export function AdminPanel({ items, setItems, contacts, setContacts }) {
     });
   }
 
-  // Group items by category for easy viewing
   const allCategories = Array.from(new Set(items.map(i => i.category)));
   const combinedCategories = Array.from(new Set([...categories, ...allCategories]));
   
@@ -170,7 +213,7 @@ export function AdminPanel({ items, setItems, contacts, setContacts }) {
         <div className="mb-6 rounded-2xl bg-[#fffaf2] p-5 shadow-sm border border-[#e2d3bf]">
           <h2 className="text-lg font-bold">Управление меню</h2>
           <p className="mt-2 text-sm text-[#7b6657]">
-            Все изменения мгновенно сохраняются в вашем браузере. Вы можете добавлять, удалять и менять цены.
+            Все изменения сохраняются в единую онлайн-базу Supabase и будут доступны с любых устройств.
           </p>
           <div className="mt-4 flex flex-wrap gap-3">
             <button onClick={() => setEditing({ category: categories[0] })} className="rounded-full bg-[#2f6b3f] px-5 py-3 text-sm font-bold text-white shadow-lg">
@@ -209,7 +252,7 @@ export function AdminPanel({ items, setItems, contacts, setContacts }) {
                   {catItems.map((item) => (
                     <div key={item.id} className="flex items-center justify-between rounded-xl bg-white p-4 shadow-sm">
                       <div className="min-w-0 pr-4">
-                        <p className="font-bold truncate">{item.name}</p>
+                        <p className="font-bold truncate">{item.name || item.title}</p>
                         <p className="text-sm text-[#7b6657]">{formatPrice(item.price)} {item.weight && `• ${item.weight}`}</p>
                       </div>
                       <div className="flex shrink-0 gap-2">
@@ -233,7 +276,7 @@ export function AdminPanel({ items, setItems, contacts, setContacts }) {
             <div className="space-y-4">
               <div>
                 <label className="mb-1 block text-sm font-semibold text-[#7b6657]">Название *</label>
-                <input className="w-full rounded-xl border border-[#d5c3aa] bg-[#fffaf2] p-3 outline-none focus:border-[#8b5e35]" placeholder="Например: Шашлык из курицы" value={editing.name || ""} onChange={(e) => setEditing({...editing, name: e.target.value})} />
+                <input className="w-full rounded-xl border border-[#d5c3aa] bg-[#fffaf2] p-3 outline-none focus:border-[#8b5e35]" placeholder="Например: Шашлык из курицы" value={editing.name || editing.title || ""} onChange={(e) => setEditing({...editing, name: e.target.value, title: e.target.value})} />
               </div>
               
               <div>
