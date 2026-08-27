@@ -1,7 +1,6 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { useMemo, useState, useEffect } from "react";
 import { categories, menuItems, popularIds, phone, whatsapp, address, mapUrl, adminPassword } from "./data";
-import { formatPrice } from "./utils";
 import { MenuCard } from "./components/MenuCard";
 import { Quantity } from "./components/Quantity";
 import { AdminPanel } from "./Admin";
