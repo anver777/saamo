@@ -1,4 +1,4 @@
-import { formatPrice, getMenuImage } from "../utils";
+import { formatPrice, getMenuImage } from "../utils/supabase";
 import { Quantity } from "./Quantity";
 
 export function MenuCard({ item, count, onChange }) {
