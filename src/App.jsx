@@ -1,10 +1,11 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { useMemo, useState, useEffect } from "react";
 import { categories, menuItems, popularIds, phone, whatsapp, address, mapUrl, adminPassword } from "./data";
+
 import { MenuCard } from "./components/MenuCard";
 import { Quantity } from "./components/Quantity";
 import { AdminPanel } from "./Admin";
-import { supabase } from './utils/supabase'
+import { supabase, formatPrice } from './utils/supabase';
 
 function App() {
   const [storedItems, setStoredItems] = useState(() => {
