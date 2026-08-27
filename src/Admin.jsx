@@ -60,34 +60,40 @@ export function AdminPanel({ items, setItems, contacts, setContacts }) {
   }
 
   async function handleSave(item) {
-    if (!item.name || !item.price || !item.category) {
-      return alert("Заполните название, цену и категорию");
+    if (!item.name && !item.title) {
+      return alert("Заполните название");
+    }
+    if (!item.price || !item.category) {
+      return alert("Заполните цену и категорию");
     }
 
-    // Подготовка объекта данных под структуру таблицы Supabase
     const payload = {
-      title: item.name,
-      price: String(item.price),
+      title: item.name || item.title,
+      price: Number(item.price),
       category: item.category,
       weight: item.weight || "",
-      image: item.image || ""
+      description: item.description || "",
+      image: item.image || "",
+      spicy: item.spicy || null,
+      vegetarian: Boolean(item.vegetarian)
     };
 
-    if (item.id) {
-      // Редактирование существующей записи
+    // Проверяем, является ли ID числом в базе (старые дефолтные элементы с текстовыми ID просто создадут новую запись в базе)
+    const isNumericId = item.id && !isNaN(Number(item.id));
+
+    if (isNumericId) {
       const { error } = await supabase
         .from('items')
         .update(payload)
-        .eq('id', item.id);
+        .eq('id', Number(item.id));
 
       if (error) {
         console.error("Ошибка при обновлении в Supabase:", error);
         return alert("Не удалось сохранить изменения в базе данных.");
       }
 
-      setItems(items.map((i) => (i.id === item.id ? { ...item, ...payload } : i)));
+      setItems(items.map((i) => (i.id === item.id ? { ...item, ...payload, name: payload.title } : i)));
     } else {
-      // Добавление новой записи
       const { data, error } = await supabase
         .from('items')
         .insert([payload])
@@ -100,7 +106,7 @@ export function AdminPanel({ items, setItems, contacts, setContacts }) {
 
       if (data && data.length > 0) {
         const newItem = { ...data[0], name: data[0].title };
-        setItems([newItem, ...items]);
+        setItems([newItem, ...items.filter(i => i.id !== item.id)]);
       }
     }
 
@@ -109,14 +115,18 @@ export function AdminPanel({ items, setItems, contacts, setContacts }) {
 
   async function handleDelete(id) {
     if (window.confirm("Точно удалить это блюдо?")) {
-      const { error } = await supabase
-        .from('items')
-        .delete()
-        .eq('id', id);
+      const isNumericId = id && !isNaN(Number(id));
+      
+      if (isNumericId) {
+        const { error } = await supabase
+          .from('items')
+          .delete()
+          .eq('id', Number(id));
 
-      if (error) {
-        console.error("Ошибка при удалении из Supabase:", error);
-        return alert("Не удалось удалить блюдо из базы данных.");
+        if (error) {
+          console.error("Ошибка при удалении из Supabase:", error);
+          return alert("Не удалось удалить блюдо из базы данных.");
+        }
       }
 
       setItems(items.filter((i) => i.id !== id));
@@ -296,7 +306,7 @@ export function AdminPanel({ items, setItems, contacts, setContacts }) {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="mb-1 block text-sm font-semibold text-[#7b6657]">Цена (₽) *</label>
-                  <input type="number" className="w-full rounded-xl border border-[#d5c3aa] bg-[#fffaf2] p-3 outline-none focus:border-[#8b5e35]" placeholder="500" value={editing.price || ""} onChange={(e) => setEditing({...editing, price: Number(e.target.value)})} />
+                  <input type="number" className="w-full rounded-xl border border-[#d5c3aa] bg-[#fffaf2] p-3 outline-none focus:border-[#8b5e35]" placeholder="500" value={editing.price || ""} onChange={(e) => setEditing({...editing, price: e.target.value})} />
                 </div>
                 <div>
                   <label className="mb-1 block text-sm font-semibold text-[#7b6657]">Вес/Объем</label>
