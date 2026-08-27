@@ -5,7 +5,7 @@ import { formatPrice } from "./utils";
 import { MenuCard } from "./components/MenuCard";
 import { Quantity } from "./components/Quantity";
 import { AdminPanel } from "./Admin";
-import { supabase } from './utils/supabase';
+import { supabase } from './utils/supabase'
 
 function App() {
   const [storedItems, setStoredItems] = useState(() => {
